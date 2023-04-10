@@ -59,18 +59,29 @@ def read_data(label_path, feature_root):
 
     return name2feats, feature_dim
 
+def extractID(s):
+    s = s.split('_')[-1]
+    s = s.split('$')[-1]
+    return int(s)
+
+def refineID_DIAG(s):
+    r = []
+    for ii in s:
+        r.append(np.searchsorted(np.sort(s), ii))
+    return r
+
 
 class CMUMOSIDataset(Dataset):
 
-    def __init__(self, label_path, audio_root, text_root, video_root):
+    def __init__(self, label_path, type):
 
         ## read utterance feats
-        name2audio, adim = read_data(label_path, audio_root)
-        name2text, tdim = read_data(label_path, text_root)
-        name2video, vdim = read_data(label_path, video_root)
-        self.adim = adim
-        self.tdim = tdim
-        self.vdim = vdim
+        # name2audio, adim = read_data(label_path, audio_root)
+        # name2text, tdim = read_data(label_path, text_root)
+        # name2video, vdim = read_data(label_path, video_root)
+        self.adim = 3750
+        self.tdim = 50
+        self.vdim = 1700
 
         ## gain video feats
         self.max_len = -1
@@ -82,64 +93,112 @@ class CMUMOSIDataset(Dataset):
         self.videoVisualGuest = {}
         self.videoLabelsNew = {}
         self.videoSpeakersNew = {}
-        self.videoIDs, self.videoLabels, self.videoSpeakers, self.videoSentences, self.trainVids, self.valVids, self.testVids = pickle.load(open(label_path, "rb"), encoding='latin1')
+        inputData = pickle.load(open('./features/aligned_50.pkl', 'rb'), encoding='latin1')
+        self.train, self.valid, self.test = inputData['train'], inputData['valid'], inputData['test']
+        self.data = self.train
+        if type == 'valid':
+            self.data = self.valid
+        elif type == 'test':
+            self.data = self.test
+        self.raw_text, self.audio, self.vision, self.id, self.text, self.text_bert, \
+        self.annotations, self.class_labels, self.regress_label = [self.data[v] for ii, v in enumerate(self.data)]
+        self.text_bert = self.text_bert[:,0,:]
+        self.max = 500
+        self.Vid = [x.split('$')[0] for x in self.id]
+        self.idsentence = [extractID(x) for x in self.id]
+        self.numDiaglouge = 0
+        self.listNumNode = []
+        self.listID_diaglouge = []
+        self.uniqueVid = []
+        current = 0
+        while current < len(self.Vid):
+            self.uniqueVid.append(self.Vid[current])
+            numNode = 1
+            id_diaglouge = [self.idsentence[current]]
+            while ((current + numNode < len(self.Vid) and (self.Vid[current+numNode] == self.Vid[current]))):
+                id_diaglouge.append(self.idsentence[current+numNode])
+                numNode+=1
+            self.numDiaglouge += 1
+            self.listNumNode.append(numNode)
+            id_diaglouge = refineID_DIAG(id_diaglouge)
+            self.listID_diaglouge.append(id_diaglouge)
+            current += numNode
+            if self.numDiaglouge > self.max:
+                break
 
-        self.vids = []
-        for vid in sorted(self.trainVids): self.vids.append(vid)
-        for vid in sorted(self.valVids): self.vids.append(vid)
-        for vid in sorted(self.testVids): self.vids.append(vid)
-
-        for ii, vid in enumerate(sorted(self.videoIDs)):
-            uids = self.videoIDs[vid]
-            labels = self.videoLabels[vid]
-            speakers = self.videoSpeakers[vid]
-
-            self.max_len = max(self.max_len, len(uids))
-            speakermap = {'': 0}
-            self.videoAudioHost[vid] = []
-            self.videoTextHost[vid] = []
-            self.videoVisualHost[vid] = []
-            self.videoAudioGuest[vid] = []
-            self.videoTextGuest[vid] = []
-            self.videoVisualGuest[vid] = []
-            self.videoLabelsNew[vid] = []
-            self.videoSpeakersNew[vid] = []
-            for ii, uid in enumerate(uids):
-                self.videoAudioHost[vid].append(name2audio[uid])
-                self.videoTextHost[vid].append(name2text[uid])
-                self.videoVisualHost[vid].append(name2video[uid])
-                self.videoAudioGuest[vid].append(np.zeros((self.adim, )))
-                self.videoTextGuest[vid].append(np.zeros((self.tdim, )))
-                self.videoVisualGuest[vid].append(np.zeros((self.vdim, )))
-                self.videoLabelsNew[vid].append(labels[ii])
-                self.videoSpeakersNew[vid].append(speakermap[speakers[ii]])
-            self.videoAudioHost[vid] = np.array(self.videoAudioHost[vid])
-            self.videoTextHost[vid] = np.array(self.videoTextHost[vid])
-            self.videoVisualHost[vid] = np.array(self.videoVisualHost[vid])
-            self.videoAudioGuest[vid] = np.array(self.videoAudioGuest[vid])
-            self.videoTextGuest[vid] = np.array(self.videoTextGuest[vid])
-            self.videoVisualGuest[vid] = np.array(self.videoVisualGuest[vid])
-            self.videoLabelsNew[vid] = np.array(self.videoLabelsNew[vid])
-            self.videoSpeakersNew[vid] = np.array(self.videoSpeakersNew[vid])
+        self.class_labels[np.where(self.class_labels == 2)] = 1
+        self.startNode = [0]
+        for i in range(len(self.listNumNode)):
+            self.startNode.append(self.startNode[-1]+self.listNumNode[i])
+        # for ii, vid in enumerate(sorted(self.videoIDs)):
+        #     uids = self.videoIDs[vid]
+        #     labels = self.videoLabels[vid]
+        #     speakers = self.videoSpeakers[vid]
+        #     self.max_len = max(self.max_len, len(uids))
+        #     speakermap = {'': 0}
+        #     self.videoAudioHost[vid] = []
+        #     self.videoTextHost[vid] = []
+        #     self.videoVisualHost[vid] = []
+        #     self.videoAudioGuest[vid] = []
+        #     self.videoTextGuest[vid] = []
+        #     self.videoVisualGuest[vid] = []
+        #     self.videoLabelsNew[vid] = []
+        #     self.videoSpeakersNew[vid] = []
+        #     for ii, uid in enumerate(uids):
+        #         self.videoAudioHost[vid].append(name2audio[uid])
+        #         self.videoTextHost[vid].append(name2text[uid])
+        #         self.videoVisualHost[vid].append(name2video[uid])
+        #         self.videoAudioGuest[vid].append(np.zeros((self.adim, )))
+        #         self.videoTextGuest[vid].append(np.zeros((self.tdim, )))
+        #         self.videoVisualGuest[vid].append(np.zeros((self.vdim, )))
+        #         self.videoLabelsNew[vid].append(labels[ii])
+        #         self.videoSpeakersNew[vid].append(speakermap[speakers[ii]])
+        #     self.videoAudioHost[vid] = np.array(self.videoAudioHost[vid])
+        #     self.videoTextHost[vid] = np.array(self.videoTextHost[vid])
+        #     self.videoVisualHost[vid] = np.array(self.videoVisualHost[vid])
+        #     self.videoAudioGuest[vid] = np.array(self.videoAudioGuest[vid])
+        #     self.videoTextGuest[vid] = np.array(self.videoTextGuest[vid])
+        #     self.videoVisualGuest[vid] = np.array(self.videoVisualGuest[vid])
+        #     self.videoLabelsNew[vid] = np.array(self.videoLabelsNew[vid])
+        #     self.videoSpeakersNew[vid] = np.array(self.videoSpeakersNew[vid])
 
 
     ## return host(A, T, V) and guest(A, T, V)
     def __getitem__(self, index):
-        vid = self.vids[index]
-        return torch.FloatTensor(self.videoAudioHost[vid]),\
-               torch.FloatTensor(self.videoTextHost[vid]),\
-               torch.FloatTensor(self.videoVisualHost[vid]),\
-               torch.FloatTensor(self.videoAudioGuest[vid]),\
-               torch.FloatTensor(self.videoTextGuest[vid]),\
-               torch.FloatTensor(self.videoVisualGuest[vid]),\
-               torch.FloatTensor(self.videoSpeakersNew[vid]),\
-               torch.FloatTensor([1]*len(self.videoLabelsNew[vid])),\
-               torch.FloatTensor(self.videoLabelsNew[vid]),\
-               vid
+        # vid = self.vids[index]
+        l,r = self.startNode[index], self.startNode[index+1]
+        audio = self.audio[l:r]
+        vision = self.vision[l:r]
+        text = self.text_bert[l:r]
+        labels = self.class_labels[l:r]
+        id_diaglouge = np.asarray(self.listID_diaglouge[index])
+        rearrangeID = [np.where(id_diaglouge == ii)[0][0] for ii in range(len(id_diaglouge))]
+        rearrangeAudio = [audio[idx,:] for idx in rearrangeID]
+        audio = np.stack(rearrangeAudio, axis=0)
+
+        rearrangeVision = [vision[idx,:] for idx in rearrangeID]
+        vision = np.stack(rearrangeVision, axis=0)
+
+        rearrangeText = [text[idx,:] for idx in rearrangeID]
+        text = np.stack(rearrangeText, axis=0)
+
+        rearrangeLabel = [labels[idx] for idx in rearrangeID]
+        labels = np.stack(rearrangeLabel, axis=0)
+
+        return torch.FloatTensor(audio),\
+               torch.FloatTensor(text),\
+               torch.FloatTensor(vision),\
+               torch.FloatTensor(np.zeros((self.adim, ))),\
+               torch.FloatTensor(np.zeros((self.tdim, ))),\
+               torch.FloatTensor(np.zeros((self.vdim, ))),\
+               torch.FloatTensor([0] * self.listNumNode[index]),\
+               torch.FloatTensor([1]*len(labels)),\
+               torch.FloatTensor(labels),\
+               self.uniqueVid[index]
 
 
     def __len__(self):
-        return len(self.vids)
+        return self.numDiaglouge
 
     def get_featDim(self):
         print (f'audio dimension: {self.adim}; text dimension: {self.tdim}; video dimension: {self.vdim}')
@@ -149,14 +208,14 @@ class CMUMOSIDataset(Dataset):
         print (f'max seqlen: {self.max_len}')
         return self.max_len
 
-    def collate_fn(self, data):
-        datnew = []
-        dat = pd.DataFrame(data)
-        for i in dat: # row index
-            if i<=5: 
-                datnew.append(pad_sequence(dat[i])) # pad
-            elif i<=8:
-                datnew.append(pad_sequence(dat[i], True)) # reverse
-            else:
-                datnew.append(dat[i].tolist()) # origin
-        return datnew
+    # def collate_fn(self, data):
+    #     datnew = []
+    #     dat = pd.DataFrame(data)
+    #     for i in dat: # row index
+    #         if i<=5: 
+    #             datnew.append(pad_sequence(dat[i])) # pad
+    #         elif i<=8:
+    #             datnew.append(pad_sequence(dat[i], True)) # reverse
+    #         else:
+    #             datnew.append(dat[i].tolist()) # origin
+    #     return datnew

@@ -25,39 +25,31 @@ from dataloader_iemocap import IEMOCAPDataset
 from dataloader_cmumosi import CMUMOSIDataset
 from loss import MaskedCELoss, MaskedMSELoss, MaskedReconLoss
 
-def get_loaders(audio_root, text_root, video_root, num_folder, dataset, batch_size, num_workers, seed):
+def get_loaders(num_folder, dataset, batch_size, num_workers, seed):
 
     ###########################################################################
     ###########################################################################
     if dataset in ['CMUMOSI', 'CMUMOSEI']:
+        train = CMUMOSIDataset(label_path=config.PATH_TO_LABEL[dataset], type = 'train')
+        test = CMUMOSIDataset(label_path=config.PATH_TO_LABEL[dataset], type ='test')
+        valid = CMUMOSIDataset(label_path=config.PATH_TO_LABEL[dataset], type = 'valid')
+        # trainNum = len(dataset.trainVids)
+        # valNum = len(dataset.valVids)
+        # testNum = len(dataset.testVids)
+        # train_idxs = list(range(0, trainNum))
+        # val_idxs = list(range(trainNum, trainNum+valNum))
+        # test_idxs = list(range(trainNum+valNum, trainNum+valNum+testNum))
 
-        dataset = CMUMOSIDataset(label_path=config.PATH_TO_LABEL[dataset],
-                                 audio_root=audio_root,
-                                 text_root=text_root,
-                                 video_root=video_root)
-        trainNum = len(dataset.trainVids)
-        valNum = len(dataset.valVids)
-        testNum = len(dataset.testVids)
-        train_idxs = list(range(0, trainNum))
-        val_idxs = list(range(trainNum, trainNum+valNum))
-        test_idxs = list(range(trainNum+valNum, trainNum+valNum+testNum))
-
-        train_loader = DataLoader(dataset,
+        train_loader = DataLoader(train,
                                   batch_size=batch_size,
-                                  sampler=SubsetRandomSampler(train_idxs),
-                                  collate_fn=dataset.collate_fn,
                                   num_workers=num_workers,
                                   pin_memory=False)
-        val_loader = DataLoader(dataset,
+        val_loader = DataLoader(valid,
                                 batch_size=batch_size,
-                                sampler=SubsetRandomSampler(val_idxs),
-                                collate_fn=dataset.collate_fn,
                                 num_workers=num_workers,
                                 pin_memory=False)
-        test_loader = DataLoader(dataset,
+        test_loader = DataLoader(test,
                                  batch_size=batch_size,
-                                 sampler=SubsetRandomSampler(test_idxs),
-                                 collate_fn=dataset.collate_fn,
                                  num_workers=num_workers,
                                  pin_memory=False)
 
@@ -66,7 +58,7 @@ def get_loaders(audio_root, text_root, video_root, num_folder, dataset, batch_si
         test_loaders = [test_loader]
 
         ## return loaders
-        adim, tdim, vdim = dataset.get_featDim()
+        adim, tdim, vdim = train.get_featDim()
         return train_loaders, val_loaders, test_loaders, adim, tdim, vdim
 
 
@@ -429,7 +421,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.0001, metavar='LR', help='learning rate')
     parser.add_argument('--l2', type=float, default=0.00001, metavar='L2', help='L2 regularization weight')
     parser.add_argument('--dropout', type=float, default=0.5, metavar='dropout', help='dropout rate')
-    parser.add_argument('--batch-size', type=int, default=32, metavar='BS', help='batch size')
+    parser.add_argument('--batch-size', type=int, default=1, metavar='BS', help='batch size')
     parser.add_argument('--epochs', type=int, default=100, metavar='E', help='number of epochs')
     parser.add_argument('--num-folder', type=int, default=5, help='folders for cross-validation [defined by args.dataset]')
     parser.add_argument('--seed', type=int, default=100, help='make split manner is same with same seed')
@@ -456,17 +448,14 @@ if __name__ == '__main__':
 
 
     print (f'====== Reading Data =======')
-    audio_feature = args.audio_feature
-    text_feature = args.text_feature
-    video_feature = args.video_feature
-    audio_root = os.path.join(config.PATH_TO_FEATURES[args.dataset], audio_feature)
-    text_root = os.path.join(config.PATH_TO_FEATURES[args.dataset], text_feature)
-    video_root = os.path.join(config.PATH_TO_FEATURES[args.dataset], video_feature)
-    assert os.path.exists(audio_root) and os.path.exists(text_root) and os.path.exists(video_root), f'features not exist!'
-    train_loaders, val_loaders, test_loaders, adim, tdim, vdim = get_loaders( audio_root = audio_root,
-                                                                              text_root  = text_root,
-                                                                              video_root = video_root,
-                                                                              num_folder = args.num_folder,
+    # audio_feature = args.audio_feature
+    # text_feature = args.text_feature
+    # video_feature = args.video_feature
+    # audio_root = os.path.join(config.PATH_TO_FEATURES[args.dataset], audio_feature)
+    # text_root = os.path.join(config.PATH_TO_FEATURES[args.dataset], text_feature)
+    # video_root = os.path.join(config.PATH_TO_FEATURES[args.dataset], video_feature)
+    # assert os.path.exists(audio_root) and os.path.exists(text_root) and os.path.exists(video_root), f'features not exist!'
+    train_loaders, val_loaders, test_loaders, adim, tdim, vdim = get_loaders(num_folder = args.num_folder,
                                                                               batch_size = args.batch_size,
                                                                               dataset = args.dataset,
                                                                               num_workers = 0,
