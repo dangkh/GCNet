@@ -177,12 +177,12 @@ def random_mask(view_num, input_len, missing_rate):
         ## further generate one_num samples
         one_num = view_num * alldata_len * one_rate - alldata_len  # left one_num after previous step
         ratio = one_num / (view_num * alldata_len)                 # now processed ratio
-        matrix_iter = (randint(0, 100, size=(alldata_len, view_num)) < int(ratio * 100)).astype(np.int) # based on ratio => matrix_iter
-        a = np.sum(((matrix_iter + view_preserve) > 1).astype(np.int)) # a: overlap number
+        matrix_iter = np.multiply(randint(0, 100, size=(alldata_len, view_num)) < int(ratio * 100), 1) # based on ratio => matrix_iter
+        a = np.sum(np.multiply(((matrix_iter + view_preserve) > 1), 1)) # a: overlap number
         one_num_iter = one_num / (1 - a / one_num)
         ratio = one_num_iter / (view_num * alldata_len)
-        matrix_iter = (randint(0, 100, size=(alldata_len, view_num)) < int(ratio * 100)).astype(np.int)
-        matrix = ((matrix_iter + view_preserve) > 0).astype(np.int)
+        matrix_iter = np.multiply(randint(0, 100, size=(alldata_len, view_num)) < int(ratio * 100), 1)
+        matrix = np.multiply((matrix_iter + view_preserve) > 0, 1)
         ratio = np.sum(matrix) / (view_num * alldata_len)
         error = abs(one_rate - ratio)
     
@@ -207,7 +207,7 @@ def train_or_eval_model(args, model, reg_loss, cls_loss, rec_loss, dataloader,
     else:
         model.eval()
 
-    for data in dataloader:
+    for data in dataloader:        
         if train: optimizer.zero_grad()
         
         ## read dataloader
@@ -219,7 +219,14 @@ def train_or_eval_model(args, model, reg_loss, cls_loss, rec_loss, dataloader,
         label: [batch, seqlen]
         """
         audio_host, text_host, visual_host = data[0], data[1], data[2]
+        audio_host = np.transpose(audio_host, (1, 0, 2))
+        text_host = np.transpose(text_host, (1, 0, 2))
+        visual_host = np.transpose(visual_host, (1, 0, 2))
         audio_guest, text_guest, visual_guest = data[3], data[4], data[5]
+        audio_guest = np.transpose(audio_guest, (1, 0, 2))
+        text_guest = np.transpose(text_guest, (1, 0, 2))
+        visual_guest = np.transpose(visual_guest, (1, 0, 2))
+
         qmask, umask, label = data[6], data[7], data[8]
         vidnames += data[-1]
         adim = audio_host.size(2)
@@ -313,6 +320,7 @@ def train_or_eval_model(args, model, reg_loss, cls_loss, rec_loss, dataloader,
         ## generate input_features: ? * [seqlen, batch, dim]
         input_features = generate_inputs(audio_host, text_host, visual_host, \
                                          audio_guest, text_guest, visual_guest, qmask)
+        
         masked_input_features = generate_inputs(masked_audio_host, masked_text_host, masked_visual_host, \
                                                 masked_audio_guest, masked_text_guest, masked_visual_guest, qmask)
         input_features_mask = generate_inputs(audio_host_mask, text_host_mask, visual_host_mask, \
@@ -513,6 +521,7 @@ if __name__ == '__main__':
             all_losses.append({'train_loss':train_loss, 'val_loss':val_loss, 'test_loss':test_loss})
             all_labels.append({'test_labels':testsave[1], 'test_preds':testsave[0], 'test_hiddens':testsave[3], 'test_names':test_names, 'test_fmask':testsave[4]})
             print(f'epoch:{epoch+1}; train_fscore:{train_fscore:2.2%}; train_loss:{train_loss[0]}; train_loss1:{train_loss[1]}; train_loss2:{train_loss[2]}')
+            print(f'epoch:{epoch+1}; test_fscore:{test_fscore:2.2%}; test_loss:{test_loss[0]};')
 
         print (f'Step3: saving and testing on the {ii+1} folder')
         best_index = np.argmax(np.array(val_fscores))
@@ -525,31 +534,33 @@ if __name__ == '__main__':
         folder_recon.append(bestrecon)
         folder_save.append(bestsave)
         folder_losswhole.append(all_losses)
-        assert args.epochs >= 60, f'epoch number should large then 60'
-        folder_savewhole.append([best_index, all_labels[10], all_labels[20], all_labels[50], all_labels[best_index]])
+
+        assert args.epochs >= 10, f'epoch number should large then 60'
+        # folder_savewhole.append([best_index, all_labels[10], all_labels[20], all_labels[50], all_labels[best_index]])
         end_time = time.time()
         print (f'>>>>> Finish: training on the {ii+1} folder, duration: {end_time - start_time} >>>>>')
+        print(f'betsf1 {bestf1} bestacc {bestacc}')
 
 
-    print (f'====== Saving =======')
-    save_root = config.MODEL_DIR
-    if not os.path.exists(save_root): os.makedirs(save_root)
-    ## gain suffix_name
-    mask_rate = args.mask_type.split('-')[-1]
-    suffix_name = f'{args.dataset.lower()}_Graph{args.base_model}_mask:{mask_rate}'
-    ## gain feature_name and cls_name
-    feature_name = f'{audio_feature};{text_feature};{video_feature}'
-    cls_name = f'lossrecon:{args.loss_recon}+lower:{args.lower_bound}+reccls:{args.reccls_flag}'
-    ## gain res_name
-    mean_f1 = np.mean(np.array(folder_f1))
-    mean_acc = np.mean(np.array(folder_acc))
-    mean_recon = np.mean(np.array(folder_recon))
-    res_name = f'f1:{mean_f1:2.2%}_acc:{mean_acc:2.2%}_reconloss:{mean_recon:.4f}'
+    # print (f'====== Saving =======')
+    # save_root = config.MODEL_DIR
+    # if not os.path.exists(save_root): os.makedirs(save_root)
+    # ## gain suffix_name
+    # mask_rate = args.mask_type.split('-')[-1]
+    # suffix_name = f'{args.dataset.lower()}_Graph{args.base_model}_mask:{mask_rate}'
+    # ## gain feature_name and cls_name
+    # feature_name = f'{audio_feature};{text_feature};{video_feature}'
+    # cls_name = f'lossrecon:{args.loss_recon}+lower:{args.lower_bound}+reccls:{args.reccls_flag}'
+    # ## gain res_name
+    # mean_f1 = np.mean(np.array(folder_f1))
+    # mean_acc = np.mean(np.array(folder_acc))
+    # mean_recon = np.mean(np.array(folder_recon))
+    # res_name = f'f1:{mean_f1:2.2%}_acc:{mean_acc:2.2%}_reconloss:{mean_recon:.4f}'
 
-    save_path = f'{save_root}/{suffix_name}_features:{feature_name}_classifier:{cls_name}_{res_name}_{time.time()}.npz'
-    print (f'save results in {save_path}')
-    np.savez_compressed(save_path,
-                        args=np.array(args, dtype=object),
-                        folder_losswhole=np.array(folder_losswhole, dtype=object),
-                        folder_savewhole=np.array(folder_savewhole, dtype=object)
-                        )
+    # save_path = f'{save_root}/{suffix_name}_features:{feature_name}_classifier:{cls_name}_{res_name}_{time.time()}.npz'
+    # print (f'save results in {save_path}')
+    # np.savez_compressed(save_path,
+    #                     args=np.array(args, dtype=object),
+    #                     folder_losswhole=np.array(folder_losswhole, dtype=object),
+    #                     folder_savewhole=np.array(folder_savewhole, dtype=object)
+    #                     )

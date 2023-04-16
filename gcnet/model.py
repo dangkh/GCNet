@@ -137,7 +137,7 @@ class GraphModel(nn.Module):
         elif self.base_model == 'GRU':
             outputs, _ = self.gru(U[0])
             outputs = outputs.unsqueeze(2)
-
+ 
         ## add graph model
         features, edge_index, edge_type, edge_type_mapping = batch_graphify(outputs, qmask, seq_lengths, self.n_speakers, 
                                                              self.window_past, self.window_future, 'temporal', self.no_cuda)
@@ -151,7 +151,7 @@ class GraphModel(nn.Module):
 
         ## for classification
         log_prob = self.smax_fc(hidden) # [seqlen, batch, n_classes]
-
+        print(log_prob.shape)
         ## for reconstruction
         rec_outputs = [self.linear_rec(hidden)]
 

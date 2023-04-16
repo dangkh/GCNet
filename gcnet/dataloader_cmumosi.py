@@ -79,10 +79,12 @@ class CMUMOSIDataset(Dataset):
         # name2audio, adim = read_data(label_path, audio_root)
         # name2text, tdim = read_data(label_path, text_root)
         # name2video, vdim = read_data(label_path, video_root)
-        self.adim = 3750
+        # self.adim = 3700
+        # self.tdim = 50
+        # self.vdim = 1750
+        self.adim = 250
         self.tdim = 50
-        self.vdim = 1700
-
+        self.vdim = 1000
         ## gain video feats
         self.max_len = -1
         self.videoAudioHost = {}
@@ -93,7 +95,7 @@ class CMUMOSIDataset(Dataset):
         self.videoVisualGuest = {}
         self.videoLabelsNew = {}
         self.videoSpeakersNew = {}
-        inputData = pickle.load(open('./features/aligned_50.pkl', 'rb'), encoding='latin1')
+        inputData = pickle.load(open('./features/CMU_MOSI.pkl', 'rb'), encoding='latin1')
         self.train, self.valid, self.test = inputData['train'], inputData['valid'], inputData['test']
         self.data = self.train
         if type == 'valid':
@@ -103,7 +105,7 @@ class CMUMOSIDataset(Dataset):
         self.raw_text, self.audio, self.vision, self.id, self.text, self.text_bert, \
         self.annotations, self.class_labels, self.regress_label = [self.data[v] for ii, v in enumerate(self.data)]
         self.text_bert = self.text_bert[:,0,:]
-        self.max = 500
+        self.max = 100
         self.Vid = [x.split('$')[0] for x in self.id]
         self.idsentence = [extractID(x) for x in self.id]
         self.numDiaglouge = 0
@@ -126,8 +128,9 @@ class CMUMOSIDataset(Dataset):
             if self.numDiaglouge > self.max:
                 break
 
-        self.class_labels[np.where(self.class_labels == 2)] = 1
+        # self.class_labels[np.where(self.class_labels == 2)] = 1
         self.startNode = [0]
+        self.max_len = max(self.listNumNode)
         for i in range(len(self.listNumNode)):
             self.startNode.append(self.startNode[-1]+self.listNumNode[i])
         # for ii, vid in enumerate(sorted(self.videoIDs)):
@@ -170,17 +173,20 @@ class CMUMOSIDataset(Dataset):
         audio = self.audio[l:r]
         vision = self.vision[l:r]
         text = self.text_bert[l:r]
-        labels = self.class_labels[l:r]
+        labels = self.regress_label[l:r]
         id_diaglouge = np.asarray(self.listID_diaglouge[index])
         rearrangeID = [np.where(id_diaglouge == ii)[0][0] for ii in range(len(id_diaglouge))]
         rearrangeAudio = [audio[idx,:] for idx in rearrangeID]
         audio = np.stack(rearrangeAudio, axis=0)
+        audio = audio.reshape(len(audio), -1)
 
         rearrangeVision = [vision[idx,:] for idx in rearrangeID]
         vision = np.stack(rearrangeVision, axis=0)
+        vision = vision.reshape(len(vision), -1)
 
         rearrangeText = [text[idx,:] for idx in rearrangeID]
         text = np.stack(rearrangeText, axis=0)
+        text = text.reshape(len(text), -1)
 
         rearrangeLabel = [labels[idx] for idx in rearrangeID]
         labels = np.stack(rearrangeLabel, axis=0)
@@ -188,9 +194,9 @@ class CMUMOSIDataset(Dataset):
         return torch.FloatTensor(audio),\
                torch.FloatTensor(text),\
                torch.FloatTensor(vision),\
-               torch.FloatTensor(np.zeros((self.adim, ))),\
-               torch.FloatTensor(np.zeros((self.tdim, ))),\
-               torch.FloatTensor(np.zeros((self.vdim, ))),\
+               torch.FloatTensor(np.zeros((len(audio), self.adim, ))),\
+               torch.FloatTensor(np.zeros((len(text),self.tdim, ))),\
+               torch.FloatTensor(np.zeros((len(vision), self.vdim, ))),\
                torch.FloatTensor([0] * self.listNumNode[index]),\
                torch.FloatTensor([1]*len(labels)),\
                torch.FloatTensor(labels),\
