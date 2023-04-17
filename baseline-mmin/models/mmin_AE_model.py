@@ -11,6 +11,18 @@ from models.networks.classifier import FcClassifier
 from models.networks.autoencoder import SimpleFcAE
 from models.utt_fusion_model import UttFusionModel
 from .utils.config import OptConfig
+import random
+import numpy as np
+import torch
+
+def seed_everything(seed=1234):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
 
 class MMINAEModel(BaseModel):
@@ -41,6 +53,7 @@ class MMINAEModel(BaseModel):
             opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         super().__init__(opt)
+        seed_everything(opt.seed)
         self.dataset = opt.dataset_mode.split('_')[0]
         self.loss_names = ['ce', 'recon']
         self.model_names = ['A', 'AA', 'V', 'VV', 'L', 'LL', 'C', 'AE']
@@ -91,16 +104,19 @@ class MMINAEModel(BaseModel):
         self.label = input['label'].to(self.device)
         self.missing_index = input['missing_index'].long().to(self.device)
         # A modality
+        # self.A_miss_index = torch.ones(acoustic.shape).to(self.device)
         self.A_miss_index = self.missing_index[:, 0].unsqueeze(1)
         self.A_miss = acoustic * self.A_miss_index               # 1 (exist), 0 (miss)
         self.A_reverse = acoustic * -1 * (self.A_miss_index - 1) # 0, 1
         self.A_full = acoustic
         # L modality
+        # self.L_miss_index = torch.ones(lexical.shape).to(self.device)
         self.L_miss_index = self.missing_index[:, 2].unsqueeze(1)
         self.L_miss = lexical * self.L_miss_index
         self.L_reverse = lexical * -1 * (self.L_miss_index - 1)
         self.L_full = lexical
         # V modality
+        # self.V_miss_index =  torch.ones(visual.shape).to(self.device)
         self.V_miss_index = self.missing_index[:, 1].unsqueeze(1)
         self.V_miss = visual * self.V_miss_index
         self.V_reverse = visual * -1 * (self.V_miss_index - 1)
@@ -129,7 +145,7 @@ class MMINAEModel(BaseModel):
         ## calculate cls loss
         if self.dataset in ['cmumosi', 'cmumosei']:                    criterion_ce = torch.nn.MSELoss()
         if self.dataset in ['boxoflies', 'iemocapfour', 'iemocapsix']: criterion_ce = torch.nn.CrossEntropyLoss()
-        self.loss_ce = criterion_ce(self.logits, self.label)
+        self.loss_ce = criterion_ce(self.logits, self.label.reshape(-1))
         ## calculate recon loss [if miss, the calculate recon loss; if exist, no recon loss]
         recon_loss = torch.nn.MSELoss(reduction='none')
         loss_recon1 = recon_loss(self.A_rec, self.A_full) * -1 * (self.A_miss_index - 1) # 1 (exist), 0 (miss)  [batch, featdim]

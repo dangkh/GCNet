@@ -60,6 +60,17 @@ def name2feat(feature_root):
     ## return name2feats
     return name2feats
 
+def extractID(s):
+    s = s.split('_')[-1]
+    s = s.split('$')[-1]
+    return int(s)
+
+
+def refineID_DIAG(s):
+    r = []
+    for ii in s:
+        r.append(np.searchsorted(np.sort(s), ii))
+    return r
 
 
 #########################################################
@@ -67,37 +78,81 @@ def name2feat(feature_root):
 #########################################################
 def change_feat_format_cmumosei():
 
-    label_pkl = '../dataset/CMUMOSEI/CMUMOSEI_features_raw_2way.pkl'
-    feat_root = '../dataset/CMUMOSEI/features'
-    save_root = './CMUMOSEI_features_2021'
-    nameA = 'wav2vec-large-c-UTT'
-    nameV = 'manet_UTT'
-    nameL = 'deberta-large-4-UTT'
-    videoIDs, videoLabels, videoSpeakers, videoSentence, trainVid, valVid, testVid = pickle.load(open(label_pkl, "rb"), encoding='latin1')
-    featrootA = os.path.join(feat_root, nameA)
-    featrootV = os.path.join(feat_root, nameV)
-    featrootL = os.path.join(feat_root, nameL)
-    name2featA = name2feat(featrootA)
-    name2featV = name2feat(featrootV)
-    name2featL = name2feat(featrootL)
+    label_pkl = '../dataset/CMUMOSEI/CMUMOSI_features_raw_2way.pkl'
+    # feat_root = '../dataset/CMUMOSEI/features'
+    save_root = './CMUMOSI_features_2021'
+    # nameA = 'wav2vec-large-c-UTT'
+    # nameV = 'manet_UTT'
+    # nameL = 'deberta-large-4-UTT'
+    inputData = pickle.load(open('../dataset/CMUMOSI/CMU_MOSI_full.pkl', 'rb'), encoding='latin1')
+    train, valid, test = inputData['train'], inputData['valid'], inputData['test']
+    # videoIDs, videoLabels, videoSpeakers, videoSentence, trainVid, valVid, testVid = pickle.load(open(label_pkl, "rb"), encoding='latin1')
+    # featrootA = os.path.join(feat_root, nameA)
+    # featrootV = os.path.join(feat_root, nameV)
+    # featrootL = os.path.join(feat_root, nameL)
+    # name2featA = name2feat(featrootA)
+    # name2featV = name2feat(featrootV)
+    # name2featL = name2feat(featrootL)
 
-    for (item1, item2) in [(trainVid, 'trn'), (valVid, 'val'), (testVid, 'tst')]:
+    for (item1, item2) in [(train, 'trn'), (valid, 'val'), (test, 'tst')]:
+        raw_text, audio_ft, vision_ft, idv, text_ft, text_bert, \
+        annotations, class_labels, regress_label = [item1[v] for ii, v in enumerate(item1)]
+        Vid = [x.split('$')[0] for x in idv]
+        idsentence = [extractID(x) for x in idv]
+        numDiaglouge = 0
+        listNumNode = []
+        listID_diaglouge = []
+        uniqueVid = []
+        current = 0
+        while current < len(Vid):
+            uniqueVid.append(Vid[current])
+            numNode = 1
+            id_diaglouge = [idsentence[current]]
+            while ((current + numNode < len(Vid) and (Vid[current+numNode] == Vid[current]))):
+                id_diaglouge.append(idsentence[current+numNode])
+                numNode+=1
+            numDiaglouge += 1
+            listNumNode.append(numNode)
+            id_diaglouge = refineID_DIAG(id_diaglouge)
+            listID_diaglouge.append(id_diaglouge)
+            current += numNode
+        startNode = [0]
+        max_len = max(listNumNode)
+        for i in range(len(listNumNode)):
+            startNode.append(startNode[-1]+listNumNode[i])
+
+
         all_A = []
         all_V = []
         all_L = []
         label = []
         int2name = []
-        for vid in tqdm.tqdm(item1):
-            int2name.extend(videoIDs[vid])
-            label.extend(videoLabels[vid])
-            for ii in range(len(videoIDs[vid])):
-                name = videoIDs[vid][ii]
-                featA = name2featA[name]
-                featV = name2featV[name]
-                featL = name2featL[name]
-                all_A.append(featA)
-                all_V.append(featV)
-                all_L.append(featL)
+        for index in range(numDiaglouge):
+            l,r = startNode[index], startNode[index+1]
+            audio = audio_ft[l:r]
+            vision = vision_ft[l:r]
+            text = text_ft[l:r]
+            labels = regress_label[l:r]
+            id_diaglouge = np.asarray(listID_diaglouge[index])
+            rearrangeID = [np.where(id_diaglouge == ii)[0][0] for ii in range(len(id_diaglouge))]
+            rearrangeAudio = [audio[idx,:] for idx in rearrangeID]
+            audio = np.stack(rearrangeAudio, axis=0)
+            audio = audio.reshape(len(audio), -1)
+
+            rearrangeVision = [vision[idx,:] for idx in rearrangeID]
+            vision = np.stack(rearrangeVision, axis=0)
+            vision = vision.reshape(len(vision), -1)
+
+            rearrangeText = [text[idx,:] for idx in rearrangeID]
+            text = np.stack(rearrangeText, axis=0)
+            text = text.reshape(len(text), -1)
+            rearrangeLabel = [labels[idx] for idx in rearrangeID]
+            labels = np.stack(rearrangeLabel, axis=0)
+
+            label.extend(labels)
+            all_A.append(audio)
+            all_V.append(vision)
+            all_L.append(text)
         all_A = np.array(all_A)
         all_V = np.array(all_V)
         all_L = np.array(all_L)
@@ -122,10 +177,10 @@ def change_feat_format_cmumosei():
         if not os.path.exists(save_temp): os.makedirs(save_temp)
         np.save(save_path, label)
 
-        save_path = f"{save_root}/target/1/{item2}_int2name.npy"
-        save_temp = os.path.split(save_path)[0]
-        if not os.path.exists(save_temp): os.makedirs(save_temp)
-        np.save(save_path, int2name)
+        # save_path = f"{save_root}/target/1/{item2}_int2name.npy"
+        # save_temp = os.path.split(save_path)[0]
+        # if not os.path.exists(save_temp): os.makedirs(save_temp)
+        # np.save(save_path, int2name)
 
 
 

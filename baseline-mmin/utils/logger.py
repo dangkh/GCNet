@@ -1,7 +1,7 @@
 import time
 import os
 import logging
-import fcntl
+# import fcntl
 
 def get_logger(path, suffix):
     cur_time = time.strftime('%Y-%m-%d-%H.%M.%S',time.localtime(time.time()))
@@ -46,21 +46,21 @@ class ResultRecorder(object):
         mean_f1 = sum(f1) / len(f1)
         return mean_acc, mean_uar, mean_f1
 
-    def write_result_to_tsv(self, results, cvNo):
-        # 使用fcntl对文件加锁,避免多个不同进程同时操作同一个文件
-        f_in = open(self.path)
-        fcntl.flock(f_in.fileno(), fcntl.LOCK_EX) # 加锁
-        content = f_in.readlines()
-        if len(content) < self.total_cv+1:
-            content += ['\n'] * (self.total_cv-len(content)+1)
-        content[cvNo] = '{:.4f}\t{:.4f}\t{:.4f}\n'.format(results['acc'], results['uar'], results['f1'])
-        if self.is_full(content):
-            mean_acc, mean_uar, mean_f1 = self.calc_mean(content)
-            content.append('{:.4f}\t{:.4f}\t{:.4f}\n'.format(mean_acc, mean_uar, mean_f1))
+    # def write_result_to_tsv(self, results, cvNo):
+    #     # 使用fcntl对文件加锁,避免多个不同进程同时操作同一个文件
+    #     f_in = open(self.path)
+    #     fcntl.flock(f_in.fileno(), fcntl.LOCK_EX) # 加锁
+    #     content = f_in.readlines()
+    #     if len(content) < self.total_cv+1:
+    #         content += ['\n'] * (self.total_cv-len(content)+1)
+    #     content[cvNo] = '{:.4f}\t{:.4f}\t{:.4f}\n'.format(results['acc'], results['uar'], results['f1'])
+    #     if self.is_full(content):
+    #         mean_acc, mean_uar, mean_f1 = self.calc_mean(content)
+    #         content.append('{:.4f}\t{:.4f}\t{:.4f}\n'.format(mean_acc, mean_uar, mean_f1))
 
-        f_out = open(self.path, 'w')
-        f_out.writelines(content)
-        f_out.close()
-        f_in.close()                              # 释放锁
+    #     f_out = open(self.path, 'w')
+    #     f_out.writelines(content)
+    #     f_out.close()
+    #     f_in.close()                              # 释放锁
         
 

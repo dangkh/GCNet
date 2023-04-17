@@ -3,3 +3,8 @@ __pycache__/config.cpython-310.pyc
 gcnet/__pycache__/dataloader_iemocap.cpython-310.pyc
 *.pyc
 *.pkl
+*.pth
+*.txt
+*.npy
+*.log
+*.conf

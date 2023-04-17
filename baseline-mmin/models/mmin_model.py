@@ -157,9 +157,9 @@ class MMINModel(BaseModel):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         # get utt level representattion
         ###############################################
-        self.feat_A_miss, _ = self.netA(self.A_miss)
-        self.feat_L_miss, _ = self.netL(self.L_miss)
-        self.feat_V_miss, _ = self.netV(self.V_miss)
+        self.feat_A_miss, _ = self.netA(self.A_miss.float())
+        self.feat_L_miss, _ = self.netL(self.L_miss.float())
+        self.feat_V_miss, _ = self.netV(self.V_miss.float())
         # self.feat_A_miss = self.netA(self.A_miss)
         # self.feat_L_miss = self.netL(self.L_miss)
         # self.feat_V_miss = self.netV(self.V_miss)
@@ -190,6 +190,8 @@ class MMINModel(BaseModel):
                 self.T_embd_V, _ = self.pretrained_encoder.netV(self.V_reverse)
                 ###############################################
                 self.T_embds = torch.cat([self.T_embd_A, self.T_embd_L, self.T_embd_V], dim=-1)
+                print(self.T_embds.shape)
+                stop
         
     def backward(self):
         """Calculate the loss for back propagation"""

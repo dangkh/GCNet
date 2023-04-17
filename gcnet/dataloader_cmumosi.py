@@ -79,12 +79,12 @@ class CMUMOSIDataset(Dataset):
         # name2audio, adim = read_data(label_path, audio_root)
         # name2text, tdim = read_data(label_path, text_root)
         # name2video, vdim = read_data(label_path, video_root)
-        # self.adim = 3700
+        self.adim = 3700
+        self.tdim = 38400
+        self.vdim = 1750
+        # self.adim = 250
         # self.tdim = 50
-        # self.vdim = 1750
-        self.adim = 250
-        self.tdim = 50
-        self.vdim = 1000
+        # self.vdim = 1000
         ## gain video feats
         self.max_len = -1
         self.videoAudioHost = {}
@@ -95,7 +95,7 @@ class CMUMOSIDataset(Dataset):
         self.videoVisualGuest = {}
         self.videoLabelsNew = {}
         self.videoSpeakersNew = {}
-        inputData = pickle.load(open('./features/CMU_MOSI.pkl', 'rb'), encoding='latin1')
+        inputData = pickle.load(open('./features/aligned_50.pkl', 'rb'), encoding='latin1')
         self.train, self.valid, self.test = inputData['train'], inputData['valid'], inputData['test']
         self.data = self.train
         if type == 'valid':
@@ -105,7 +105,7 @@ class CMUMOSIDataset(Dataset):
         self.raw_text, self.audio, self.vision, self.id, self.text, self.text_bert, \
         self.annotations, self.class_labels, self.regress_label = [self.data[v] for ii, v in enumerate(self.data)]
         self.text_bert = self.text_bert[:,0,:]
-        self.max = 100
+        self.max = 200
         self.Vid = [x.split('$')[0] for x in self.id]
         self.idsentence = [extractID(x) for x in self.id]
         self.numDiaglouge = 0
@@ -172,7 +172,7 @@ class CMUMOSIDataset(Dataset):
         l,r = self.startNode[index], self.startNode[index+1]
         audio = self.audio[l:r]
         vision = self.vision[l:r]
-        text = self.text_bert[l:r]
+        text = self.text[l:r]
         labels = self.regress_label[l:r]
         id_diaglouge = np.asarray(self.listID_diaglouge[index])
         rearrangeID = [np.where(id_diaglouge == ii)[0][0] for ii in range(len(id_diaglouge))]
@@ -187,7 +187,6 @@ class CMUMOSIDataset(Dataset):
         rearrangeText = [text[idx,:] for idx in rearrangeID]
         text = np.stack(rearrangeText, axis=0)
         text = text.reshape(len(text), -1)
-
         rearrangeLabel = [labels[idx] for idx in rearrangeID]
         labels = np.stack(rearrangeLabel, axis=0)
 

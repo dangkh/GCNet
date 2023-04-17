@@ -6,6 +6,18 @@ from data import create_dataset_with_args
 from models import create_model
 from utils.logger import get_logger, ResultRecorder
 from sklearn.metrics import accuracy_score, recall_score, f1_score, confusion_matrix
+import random
+import torch
+import numpy as np
+
+def seed_everything(seed=1234):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
 def make_path(path):
     if not os.path.exists(path):
@@ -22,7 +34,7 @@ def eval(model, val_iter, is_save=False, phase='test'):
         pred = model.pred.detach().cpu().numpy()
         label = data['label']
         total_pred.append(pred)
-        total_label.append(label)
+        total_label.append(label.reshape(-1))
     total_pred = np.concatenate(total_pred)   # [sample_num, ]
     total_label = np.concatenate(total_label) # [sample_num, ]
 
@@ -53,14 +65,14 @@ def clean_chekpoints(expr_name, store_epoch):
             os.remove(os.path.join(root, checkpoint))
 
 
-
 if __name__ == '__main__':
     opt = TrainOptions().parse()                        # get training options
+    seed_everything(opt.seed)
     logger_path = os.path.join(opt.log_dir, opt.name, str(opt.cvNo)) # get logger path
     if not os.path.exists(logger_path):                 # make sure logger path exists
         os.mkdir(logger_path)
 
-    result_recorder = ResultRecorder(os.path.join(opt.log_dir, opt.name, 'result.tsv'), total_cv=12) # init result recoreder
+    # result_recorder = ResultRecorder(os.path.join(opt.log_dir, opt.name, 'result.tsv'), total_cv=12) # init result recoreder
     suffix = '_'.join([opt.model, opt.dataset_mode])    # get logger suffix: utt_fusion_multimodal
     logger = get_logger(logger_path, suffix)            # get logger
 
@@ -104,7 +116,6 @@ if __name__ == '__main__':
                 total_iters += 1                # opt.batch_size
                 model.set_input(data)           # unpack data from dataset and apply preprocessing
                 model.optimize_parameters(epoch)   # calculate loss functions, get gradients, update network weights
-                    
                 if total_iters % opt.print_freq == 0:    # print training losses and save logging information to the disk
                     losses = model.get_current_losses()
                     t_comp = (time.time() - iter_start_time) / opt.batch_size
@@ -133,6 +144,12 @@ if __name__ == '__main__':
         logger.info('Loading best model found on val set: epoch-%d' % best_eval_epoch)
         model.load_networks(best_eval_epoch)
         acc, f1 = eval(model, tst_dataset, is_save=True, phase='test')
+        print(f'Acc test: {acc} ;f1 test: {f1}')
+        sourceFile = open('./logMMIM_AE.txt', 'a')
+        print(opt, file = sourceFile)
+        print(f'Highest Acc: {acc}, final f1 {f1}', file = sourceFile)
+        print('*'*10, 'End' ,'*'*10, file = sourceFile)
+        sourceFile.close()
         folder_acc.append(acc)
         folder_f1.append(f1)
         clean_chekpoints(opt.name + '/' + str(opt.cvNo), best_eval_epoch)

@@ -151,7 +151,6 @@ class GraphModel(nn.Module):
 
         ## for classification
         log_prob = self.smax_fc(hidden) # [seqlen, batch, n_classes]
-        print(log_prob.shape)
         ## for reconstruction
         rec_outputs = [self.linear_rec(hidden)]
 

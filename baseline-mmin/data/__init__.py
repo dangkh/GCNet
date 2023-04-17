@@ -103,8 +103,7 @@ class CustomDatasetDataLoader():
                 batch_size=opt.batch_size,
                 shuffle=not opt.serial_batches,
                 num_workers=int(opt.num_threads),
-                drop_last=False,
-                collate_fn=self.dataset.collate_fn
+                drop_last=False
             )
 
         else:

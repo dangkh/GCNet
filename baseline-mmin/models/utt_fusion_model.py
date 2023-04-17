@@ -131,8 +131,8 @@ class UttFusionModel(BaseModel):
         
     def backward(self):
         """Calculate the loss for back propagation"""
-        self.loss_CE = self.criterion_ce(self.logits, self.label)
-        loss = self.loss_CE
+        self.loss_CE = self.criterion_ce(self.logits, self.label.reshape(-1))
+        loss = self.loss_CE.float()
         loss.backward()
         for model in self.model_names:
             torch.nn.utils.clip_grad_norm_(getattr(self, 'net'+model).parameters(), 5.0) # 0.1
