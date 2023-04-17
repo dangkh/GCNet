@@ -1,4 +1,6 @@
 import torch
+import random
+import numpy as np
 import os
 import json
 from collections import OrderedDict
@@ -12,6 +14,14 @@ from models.networks.autoencoder import ResidualAE
 from models.utt_fusion_model import UttFusionModel
 from .utils.config import OptConfig
 
+def seed_everything(seed=1234):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
 class MMINCRAModel(BaseModel):
     @staticmethod
@@ -42,6 +52,7 @@ class MMINCRAModel(BaseModel):
             opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         super().__init__(opt)
+        seed_everything(opt.seed)
         self.dataset = opt.dataset_mode.split('_')[0]
         self.loss_names = ['ce', 'recon']
         self.model_names = ['A', 'AA', 'V', 'VV', 'L', 'LL', 'C', 'AE']
@@ -89,21 +100,23 @@ class MMINCRAModel(BaseModel):
         acoustic = input['A_feat'].float().to(self.device)
         lexical = input['L_feat'].float().to(self.device)
         visual = input['V_feat'].float().to(self.device)
-
         self.label = input['label'].to(self.device)
-        # self.missing_index = input['missing_index'].long().to(self.device)
+        self.missing_index = input['missing_index'].long().to(self.device)
         # A modality
-        self.A_miss_index = torch.ones(acoustic.shape).to(self.device)
-        self.A_miss = acoustic * self.A_miss_index
-        self.A_reverse = acoustic * -1 * (self.A_miss_index - 1)
+        # self.A_miss_index = torch.ones(acoustic.shape).to(self.device)
+        self.A_miss_index = self.missing_index[:, 0].unsqueeze(1)
+        self.A_miss = acoustic * self.A_miss_index               # 1 (exist), 0 (miss)
+        self.A_reverse = acoustic * -1 * (self.A_miss_index - 1) # 0, 1
         self.A_full = acoustic
         # L modality
-        self.L_miss_index = torch.ones(lexical.shape).to(self.device)
+        # self.L_miss_index = torch.ones(lexical.shape).to(self.device)
+        self.L_miss_index = self.missing_index[:, 2].unsqueeze(1)
         self.L_miss = lexical * self.L_miss_index
         self.L_reverse = lexical * -1 * (self.L_miss_index - 1)
         self.L_full = lexical
         # V modality
-        self.V_miss_index = torch.ones(visual.shape).to(self.device)
+        # self.V_miss_index =  torch.ones(visual.shape).to(self.device)
+        self.V_miss_index = self.missing_index[:, 1].unsqueeze(1)
         self.V_miss = visual * self.V_miss_index
         self.V_reverse = visual * -1 * (self.V_miss_index - 1)
         self.V_full = visual

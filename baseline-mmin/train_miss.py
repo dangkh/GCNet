@@ -31,16 +31,16 @@ def eval(opt, model, dataset):
         pred = model.pred.detach().cpu().numpy()
         loss_recon = model.loss_recon.detach().cpu().numpy()
         hiddens = model.hiddens.detach().cpu().numpy()
-        name = data['int2name']
+        # name = data['int2name']
         label = data['label']
 
-        total_name.append(name)
+        # total_name.append(name)
         total_pred.append(pred)
         total_label.append(label)
         total_recon.append(loss_recon)
         total_hidden.append(hiddens)
 
-    total_name = np.concatenate(total_name)             # [sample_num, ]
+    # total_name = np.concatenate(total_name)             # [sample_num, ]
     total_pred = np.concatenate(total_pred)             # [sample_num, num_classes]
     total_label = np.concatenate(total_label)           # [sample_num, ]
     total_hidden = np.concatenate(total_hidden)         # [sample_num, featdim]
@@ -55,7 +55,7 @@ def eval(opt, model, dataset):
     elif dataset in ['iemocapfour', 'iemocapsix']:
         acc = accuracy_score(total_label, np.argmax(total_pred, 1))
         f1 = f1_score(total_label, np.argmax(total_pred, 1), average='weighted')
-    return f1, acc, total_recon, [total_label, total_pred, total_hidden, total_name]
+    return f1, acc, total_recon, [total_label, total_pred, total_hidden, _]
     
     
 def clean_chekpoints(expr_name, store_epoch):

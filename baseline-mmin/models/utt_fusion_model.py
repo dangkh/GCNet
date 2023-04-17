@@ -36,7 +36,7 @@ class UttFusionModel(BaseModel):
         super().__init__(opt)
         # our expriment is on 10 fold setting, teacher is on 5 fold setting, the train set should match
         self.loss_names = ['CE']
-        self.modality = opt.modality # 'AVL'
+        self.modality = 'AVL'
         self.model_names = ['C']
         cls_layers = list(map(lambda x: int(x), opt.cls_layers.split(','))) # [128, 128]
         cls_input_size = opt.embd_size_a * int("A" in self.modality) + \

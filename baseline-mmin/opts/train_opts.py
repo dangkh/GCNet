@@ -33,5 +33,6 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--seed', type=int, default=100, help='make split manner is same with same seed')
         # expr setting 
         parser.add_argument('--run_idx', type=int, default=1, help='experiment number; for repeat experiment')
+        parser.add_argument('--output', help='savedFile', default='./log.txt')
         self.isTrain = True
         return parser

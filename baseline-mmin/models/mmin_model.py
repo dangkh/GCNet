@@ -1,4 +1,6 @@
 import torch
+import random
+import numpy as np
 import os
 import json
 from collections import OrderedDict
@@ -12,6 +14,14 @@ from models.networks.autoencoder import ResidualAE
 from models.utt_fusion_model import UttFusionModel
 from .utils.config import OptConfig
 
+def seed_everything(seed=1234):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
 class MMINModel(BaseModel):
     @staticmethod
@@ -43,6 +53,7 @@ class MMINModel(BaseModel):
             opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         super().__init__(opt)
+        seed_everything(opt.seed)
         # our expriment is on 10 fold setting, teacher is on 5 fold setting, the train set should match
         self.loss_names = ['CE', 'mse', 'cycle']
         self.model_names = ['A', 'V', 'L', 'C', 'AE', 'AE_cycle'] # name of each layer
@@ -134,22 +145,26 @@ class MMINModel(BaseModel):
         acoustic = input['A_feat'].float().to(self.device) # [256, 512]
         lexical = input['L_feat'].float().to(self.device)  # [256, 1024]
         visual = input['V_feat'].float().to(self.device)   # [256, 1024]
-        self.label = input['label'].to(self.device)    # [256]
-        self.missing_index = input['missing_index'].long().to(self.device) # [256, 3]
+        self.label = input['label'].to(self.device)
+        self.missing_index = input['missing_index'].long().to(self.device)
         # A modality
-        #############################################
-        self.A_miss_index = self.missing_index[:, 0].unsqueeze(1) # [256, 1]
-        self.A_miss = acoustic * self.A_miss_index
-        self.A_reverse = acoustic * -1 * (self.A_miss_index - 1)
+        # self.A_miss_index = torch.ones(acoustic.shape).to(self.device)
+        self.A_miss_index = self.missing_index[:, 0].unsqueeze(1)
+        self.A_miss = acoustic * self.A_miss_index               # 1 (exist), 0 (miss)
+        self.A_reverse = acoustic * -1 * (self.A_miss_index - 1) # 0, 1
+        self.A_full = acoustic
         # L modality
+        # self.L_miss_index = torch.ones(lexical.shape).to(self.device)
         self.L_miss_index = self.missing_index[:, 2].unsqueeze(1)
         self.L_miss = lexical * self.L_miss_index
         self.L_reverse = lexical * -1 * (self.L_miss_index - 1)
+        self.L_full = lexical
         # V modality
+        # self.V_miss_index =  torch.ones(visual.shape).to(self.device)
         self.V_miss_index = self.missing_index[:, 1].unsqueeze(1)
         self.V_miss = visual * self.V_miss_index
         self.V_reverse = visual * -1 * (self.V_miss_index - 1)
-        #############################################
+        self.V_full = visual
 
 
 
@@ -189,13 +204,11 @@ class MMINModel(BaseModel):
                 self.T_embd_L, _ = self.pretrained_encoder.netL(self.L_reverse)
                 self.T_embd_V, _ = self.pretrained_encoder.netV(self.V_reverse)
                 ###############################################
-                self.T_embds = torch.cat([self.T_embd_A, self.T_embd_L, self.T_embd_V], dim=-1)
-                print(self.T_embds.shape)
-                stop
+                self.T_embds = torch.cat([self.T_embd_A, self.T_embd_L, self.T_embd_V], dim=-1)                
         
     def backward(self):
         """Calculate the loss for back propagation"""
-        self.loss_CE = self.ce_weight * self.criterion_ce(self.logits, self.label)
+        self.loss_CE = self.ce_weight * self.criterion_ce(self.logits, self.label.reshape(-1))
         self.loss_mse = self.mse_weight * self.criterion_mse(self.T_embds, self.recon_fusion)
         self.loss_cycle = self.cycle_weight * self.criterion_mse(self.feat_fusion_miss.detach(), self.recon_cycle)
         loss = self.loss_CE + self.loss_mse + self.loss_cycle

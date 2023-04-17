@@ -145,7 +145,7 @@ if __name__ == '__main__':
         model.load_networks(best_eval_epoch)
         acc, f1 = eval(model, tst_dataset, is_save=True, phase='test')
         print(f'Acc test: {acc} ;f1 test: {f1}')
-        sourceFile = open('./logMMIM_AE.txt', 'a')
+        sourceFile = open(opt.output, 'a')
         print(opt, file = sourceFile)
         print(f'Highest Acc: {acc}, final f1 {f1}', file = sourceFile)
         print('*'*10, 'End' ,'*'*10, file = sourceFile)

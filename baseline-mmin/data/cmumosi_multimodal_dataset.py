@@ -56,7 +56,7 @@ def random_mask(view_num, alldata_len, missing_rate):
     ## ensure at least one of them is avaliable 
     ## since some sample is overlapped, which increase difficulties
     error = 1
-    while error >= 0.005:
+    while error >= 0.007:
 
         ## gain initial view_preserve
         enc = OneHotEncoder(categories=[np.arange(view_num)])
