@@ -145,7 +145,7 @@ class MMINCRAModel(BaseModel):
        ## calculate cls loss
         if self.dataset in ['cmumosi', 'cmumosei']:                    criterion_ce = torch.nn.MSELoss()
         if self.dataset in ['boxoflies', 'iemocapfour', 'iemocapsix']: criterion_ce = torch.nn.CrossEntropyLoss()
-        self.loss_ce = criterion_ce(self.logits, self.label.reshape(-1))
+        self.loss_ce = criterion_ce(self.logits.reshape(-1), self.label.reshape(-1))
         ## calculate recon loss [if miss, the calculate recon loss; if exist, no recon loss]
         recon_loss = torch.nn.MSELoss(reduction='none')
         loss_recon1 = recon_loss(self.A_rec, self.A_full) * -1 * (self.A_miss_index - 1) # 1 (exist), 0 (miss)  [batch, featdim]

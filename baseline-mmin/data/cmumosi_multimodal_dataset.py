@@ -101,9 +101,9 @@ class CMUMOSIMultimodalDataset(BaseDataset):
         cvNo = opt.cvNo
         seed_everything(opt.seed)
         self.mask_rate = opt.mask_rate
-        self.adim = 3700
-        self.tdim = 38400
-        self.vdim = 1750
+        # self.adim = 3700
+        # self.tdim = 38400
+        # self.vdim = 1750
         # self.adim = 250
         # self.tdim = 50
         # self.vdim = 1000

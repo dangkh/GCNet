@@ -33,7 +33,7 @@ def eval(model, val_iter, is_save=False, phase='test'):
         model.test() # forward and gain results
         pred = model.pred.detach().cpu().numpy()
         label = data['label']
-        total_pred.append(pred)
+        total_pred.append(pred.reshape(-1))
         total_label.append(label.reshape(-1))
     total_pred = np.concatenate(total_pred)   # [sample_num, ]
     total_label = np.concatenate(total_label) # [sample_num, ]
